@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCS Proxy Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div x-data="mcsManager()" class="container mx-auto p-4">
+        <!-- Header -->
+        <header class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">MCS Proxy Manager</h1>
+                    <p class="text-gray-600">Manage your Model Context Servers</p>
+                </div>
+                <div class="flex items-center">
+                    <span class="mr-2 text-sm text-gray-600">Status:</span>
+                    <span 
+                        x-text="systemStatus === 'online' ? 'Online' : 'Connecting...'" 
+                        :class="systemStatus === 'online' ? 'text-green-600' : 'text-yellow-600'"
+                        class="font-medium"></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex flex-col md:flex-row gap-6">
+            <!-- Server List Panel -->
+            <div class="bg-white rounded-lg shadow-md p-6 flex-1">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-gray-800">MCS Instances</h2>
+                    <button 
+                        @click="refreshServers()" 
+                        class="text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-sync-alt mr-1"></i> Refresh
+                    </button>
+                </div>
+
+                <!-- Loading state -->
+                <div x-show="loading" class="flex justify-center my-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+                
+                <!-- No servers message -->
+                <div x-show="!loading && servers.length === 0" class="text-center py-10 text-gray-500">
+                    <i class="fas fa-server text-4xl mb-3"></i>
+                    <p>No MCS instances running</p>
+                    <p class="text-sm mt-2">Create a new instance to get started</p>
+                </div>
+
+                <!-- Server list -->
+                <div x-show="!loading && servers.length > 0">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white">
+                            <thead class="bg-gray-50 text-gray-600 text-sm">
+                                <tr>
+                                    <th class="py-3 px-4 text-left">Name</th>
+                                    <th class="py-3 px-4 text-left">Repository</th>
+                                    <th class="py-3 px-4 text-left">Created</th>
+                                    <th class="py-3 px-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <template x-for="server in servers" :key="server.name">
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="py-4 px-4 font-medium text-gray-900" x-text="server.name"></td>
+                                        <td class="py-4 px-4 text-gray-600">
+                                            <span x-text="shortenRepoUrl(server.repoUrl)" class="text-sm"></span>
+                                        </td>
+                                        <td class="py-4 px-4 text-gray-600 text-sm" x-text="formatDate(server.startedAt)"></td>
+                                        <td class="py-4 px-4 text-right space-x-2">
+                                            <a :href="server.sseEndpoint" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
+                                                <i class="fas fa-external-link-alt"></i> SSE
+                                            </a>
+                                            <button 
+                                                @click="confirmDelete(server.name)" 
+                                                class="text-red-600 hover:text-red-800 text-sm ml-3">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="bg-white rounded-lg shadow-md p-6 md:w-96">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">Create Instance</h2>
+                
+                <!-- Form -->
+                <form @submit.prevent="createServer()" class="space-y-4">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Instance Name</label>
+                        <input 
+                            type="text" 
+                            id="name" 
+                            x-model="newServer.name" 
+                            placeholder="e.g., project-x"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                            required
+                            pattern="[a-zA-Z0-9-_]+"
+                            title="Only letters, numbers, dashes, and underscores are allowed">
+                        <p class="mt-1 text-xs text-gray-500">Only letters, numbers, dashes, and underscores</p>
+                    </div>
+                    
+                    <div>
+                        <label for="repoUrl" class="block text-sm font-medium text-gray-700 mb-1">Git Repository URL</label>
+                        <input 
+                            type="url" 
+                            id="repoUrl" 
+                            x-model="newServer.repoUrl" 
+                            placeholder="https://github.com/username/repo.git"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                            required>
+                    </div>
+                    
+                    <button 
+                        type="submit" 
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
+                        :disabled="creatingServer"
+                        :class="creatingServer ? 'opacity-75 cursor-not-allowed' : ''">
+                        <i class="fas fa-plus mr-2"></i>
+                        <span x-text="creatingServer ? 'Creating...' : 'Create Instance'"></span>
+                    </button>
+                </form>
+
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-700 mb-3">System Info</h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Instances:</span>
+                            <span class="font-medium" x-text="servers.length"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">API Status:</span>
+                            <span 
+                                x-text="apiStatus" 
+                                :class="apiStatus === 'OK' ? 'text-green-600' : 'text-red-600'"
+                                class="font-medium"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Delete Confirmation Modal -->
+        <div 
+            x-show="showDeleteModal" 
+            x-transition
+            class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div class="bg-white rounded-lg shadow-lg p-6 max-w-md mx-4 sm:mx-auto">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
+                <p class="text-gray-600 mb-6">
+                    Are you sure you want to delete the instance <span x-text="serverToDelete" class="font-semibold"></span>?
+                    This action cannot be undone.
+                </p>
+                <div class="flex justify-end gap-3">
+                    <button 
+                        @click="showDeleteModal = false" 
+                        class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md transition">
+                        Cancel
+                    </button>
+                    <button 
+                        @click="deleteServer()" 
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition">
+                        <span x-text="deletingServer ? 'Deleting...' : 'Delete'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Toast -->
+        <div 
+            x-show="notification.show" 
+            x-transition 
+            @click="notification.show = false"
+            class="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg p-4 max-w-md border-l-4"
+            :class="{
+                'border-green-500': notification.type === 'success',
+                'border-red-500': notification.type === 'error',
+                'border-yellow-500': notification.type === 'warning'
+            }">
+            <div class="flex items-start">
+                <div class="flex-shrink-0 mr-3">
+                    <i 
+                        class="fas"
+                        :class="{
+                            'fa-check-circle text-green-500': notification.type === 'success',
+                            'fa-exclamation-circle text-red-500': notification.type === 'error',
+                            'fa-exclamation-triangle text-yellow-500': notification.type === 'warning'
+                        }"></i>
+                </div>
+                <div>
+                    <h4 
+                        class="text-sm font-medium"
+                        :class="{
+                            'text-green-800': notification.type === 'success',
+                            'text-red-800': notification.type === 'error',
+                            'text-yellow-800': notification.type === 'warning'
+                        }" 
+                        x-text="notification.title"></h4>
+                    <p class="mt-1 text-sm text-gray-600" x-text="notification.message"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function mcsManager() {
+            return {
+                servers: [],
+                loading: true,
+                systemStatus: 'connecting',
+                apiStatus: 'Checking...',
+                creatingServer: false,
+                deletingServer: false,
+                showDeleteModal: false,
+                serverToDelete: '',
+                newServer: {
+                    name: '',
+                    repoUrl: ''
+                },
+                notification: {
+                    show: false,
+                    type: 'success',
+                    title: '',
+                    message: ''
+                },
+                
+                init() {
+                    this.refreshServers();
+                    this.checkHealth();
+                    // Refresh servers every 30 seconds
+                    setInterval(() => this.refreshServers(), 30000);
+                },
+                
+                async refreshServers() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('/api/servers');
+                        if (!response.ok) throw new Error('Failed to fetch servers');
+                        this.servers = await response.json();
+                        this.systemStatus = 'online';
+                    } catch (error) {
+                        console.error('Error fetching servers:', error);
+                        this.showNotification('error', 'Fetch Error', 'Could not load server instances');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async checkHealth() {
+                    try {
+                        const response = await fetch('/api/health');
+                        if (!response.ok) throw new Error('Health check failed');
+                        const data = await response.json();
+                        this.apiStatus = data.status === 'ok' ? 'OK' : 'Error';
+                        this.systemStatus = 'online';
+                    } catch (error) {
+                        console.error('Health check error:', error);
+                        this.apiStatus = 'Error';
+                    }
+                },
+                
+                async createServer() {
+                    this.creatingServer = true;
+                    try {
+                        const response = await fetch('/api/launch', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.newServer)
+                        });
+                        
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'Failed to create server');
+                        }
+                        
+                        const data = await response.json();
+                        this.servers.push(data);
+                        this.newServer = { name: '', repoUrl: '' };
+                        this.showNotification('success', 'Success', `Instance "${data.name}" created successfully`);
+                    } catch (error) {
+                        console.error('Error creating server:', error);
+                        this.showNotification('error', 'Creation Failed', error.message);
+                    } finally {
+                        this.creatingServer = false;
+                    }
+                },
+                
+                confirmDelete(serverName) {
+                    this.serverToDelete = serverName;
+                    this.showDeleteModal = true;
+                },
+                
+                async deleteServer() {
+                    this.deletingServer = true;
+                    try {
+                        const response = await fetch(`/api/servers/${this.serverToDelete}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'Failed to delete server');
+                        }
+                        
+                        this.servers = this.servers.filter(s => s.name !== this.serverToDelete);
+                        this.showNotification('success', 'Success', `Instance "${this.serverToDelete}" deleted successfully`);
+                        this.showDeleteModal = false;
+                    } catch (error) {
+                        console.error('Error deleting server:', error);
+                        this.showNotification('error', 'Deletion Failed', error.message);
+                    } finally {
+                        this.deletingServer = false;
+                    }
+                },
+                
+                shortenRepoUrl(url) {
+                    if (!url) return '';
+                    // Remove protocol and trailing .git
+                    return url.replace(/^https?:\/\//, '').replace(/\.git$/, '');
+                },
+                
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const date = new Date(dateString);
+                    return date.toLocaleString();
+                },
+                
+                showNotification(type, title, message) {
+                    this.notification = { show: true, type, title, message };
+                    // Auto-hide after 5 seconds
+                    setTimeout(() => {
+                        this.notification.show = false;
+                    }, 5000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
