@@ -26,6 +26,10 @@ const redisClient = new Redis({
 const mcpServers = {};
 let nextAvailablePort = BASE_MCP_PORT;
 
+// Serve static files
+app.use(express.static('public'));
+
+// Parse JSON requests
 app.use(bodyParser.json());
 
 // Redis connection handling
@@ -218,7 +222,8 @@ app.post('/api/launch', async (req, res) => {
       name,
       repoUrl,
       sseEndpoint: `/mcs/${name}/sse`,
-      apiEndpoint: `/mcs/${name}`
+      apiEndpoint: `/mcs/${name}`,
+      startedAt: serverData.startedAt
     });
   } catch (error) {
     console.error('Launch error:', error);
@@ -266,6 +271,16 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     servers: Object.keys(mcpServers).length
   });
+});
+
+// Serve the main UI for all routes that aren't explicitly handled
+app.get('*', (req, res) => {
+  // Skip if it's an API route or MCS route
+  if (req.url.startsWith('/api/') || req.url.startsWith('/mcs/')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Initialize from Redis and then start the server
