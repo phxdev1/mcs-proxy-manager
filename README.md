@@ -7,14 +7,27 @@ A NodeJS API for managing multiple Model Context Servers (MCS) using Smithery wi
 - Manage instances with a simple REST API
 - Persist instance configurations with Redis
 
+![MCS Proxy Manager Interface](public/screenshot.png)
+
 ## Features
 
+- **Modern UI**: Clean and intuitive Tailwind CSS interface for easy management
 - **Named Subdirectory Routing**: Access each MCS via `/mcs/{name}/` path
 - **Git Repository Support**: Launch MCS instances directly from Git repositories
 - **Redis Persistence**: Configurations persist across restarts
 - **Single Port Exposure**: Only a single port needs to be exposed
 - **Automatic Recovery**: MCS instances are automatically recovered on restart
 - **CI/CD Integration**: Automatic deployment to RunPod via GitHub Actions
+
+## User Interface
+
+The application comes with a modern web interface that allows you to:
+
+- View all running MCS instances
+- Create new instances by specifying Git repository URLs
+- Access SSE endpoints with a single click
+- Delete instances when no longer needed
+- Monitor system status and health
 
 ## API Endpoints
 
@@ -100,14 +113,14 @@ To use this workflow, you need to set up the following GitHub secrets:
 | REDIS_HOST | Redis host | redis |
 | REDIS_PORT | Redis port | 6379 |
 
-## Architecture
+## Technology Stack
 
-The application consists of:
-
-1. **API Server**: NodeJS Express application for managing MCS instances
-2. **Redis**: For persisting instance configurations
-3. **Dynamic Proxying**: Routes requests to the appropriate MCS instance
-4. **GitHub Actions**: CI/CD pipeline for automatic deployment
+- **Backend**: Node.js with Express.js
+- **Frontend**: Tailwind CSS and Alpine.js
+- **Database**: Redis for persistence
+- **Proxy**: HTTP-Proxy-Middleware for routing
+- **Process Management**: Node.js child_process module
+- **CI/CD**: GitHub Actions
 
 ## Use Case in RunPod
 
@@ -115,7 +128,7 @@ This project is particularly useful for RunPod deployments where:
 
 1. You need to host multiple Model Context Servers
 2. You want to expose them all through a single port
-3. You need to manage them programmatically
+3. You need to manage them programmatically or through a UI
 4. You need instance persistence across restarts
 
 ## License
