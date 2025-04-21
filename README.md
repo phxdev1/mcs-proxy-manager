@@ -14,6 +14,7 @@ A NodeJS API for managing multiple Model Context Servers (MCS) using Smithery wi
 - **Redis Persistence**: Configurations persist across restarts
 - **Single Port Exposure**: Only a single port needs to be exposed
 - **Automatic Recovery**: MCS instances are automatically recovered on restart
+- **CI/CD Integration**: Automatic deployment to RunPod via GitHub Actions
 
 ## API Endpoints
 
@@ -59,9 +60,9 @@ DELETE /api/servers/{name}
 GET /api/health
 ```
 
-## Deployment with Docker Compose
+## Deployment
 
-The application is packaged with Docker Compose for easy deployment:
+### Local Deployment with Docker Compose
 
 ```bash
 # Clone the repository
@@ -71,6 +72,25 @@ cd mcs-proxy-manager
 # Start the services
 docker-compose up -d
 ```
+
+### RunPod Deployment
+
+The application is automatically deployed to RunPod when changes are pushed to the main branch using GitHub Actions.
+
+#### GitHub Actions Setup
+
+This repository includes a GitHub Actions workflow that:
+
+1. Builds a Docker image when code is pushed to main
+2. Pushes the image to DockerHub
+3. Deploys the image to a RunPod instance
+
+To use this workflow, you need to set up the following GitHub secrets:
+
+- `DOCKERHUB_USERNAME` - Your DockerHub username
+- `DOCKERHUB_TOKEN` - Your DockerHub access token
+- `RUNPOD_API_KEY` - Your RunPod API key
+- `RUNPOD_POD_ID` - The ID of your RunPod instance
 
 ## Environment Variables
 
@@ -87,6 +107,7 @@ The application consists of:
 1. **API Server**: NodeJS Express application for managing MCS instances
 2. **Redis**: For persisting instance configurations
 3. **Dynamic Proxying**: Routes requests to the appropriate MCS instance
+4. **GitHub Actions**: CI/CD pipeline for automatic deployment
 
 ## Use Case in RunPod
 
